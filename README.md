@@ -10,3 +10,4 @@ This script requires the following packages:
 * scipy
 * BaselineRemoval
 
+You can install all these packages with: `pip install requirements.txt`
