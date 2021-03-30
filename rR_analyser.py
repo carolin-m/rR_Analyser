@@ -494,7 +494,7 @@ class rR_Analyzer:
 
 
     def read_frames(self, foldername='data', subfoldername='SEC', file_ending='.txt', xmin=700,
-                    xmax=2500, steps=None):
+                    xmax=2500, steps=None, columntype='single'):
         ''' Reads raw data (multiple frames exported WinSpec ascii-files)
 
         Args:
@@ -505,10 +505,16 @@ class rR_Analyzer:
             xmax: maximum rel. wavenumber value (float/integer, default: 2500)
             steps: specify number of points in the ranging from xmin to xmax (default:
             None, calculates the number of steps from xmin and xmax)
+            columntype: single or multiple (depends on exporpt function in WinSpec, default:'single')
 
+        Raises:
+            columntype must be either single or multiple
         Returns:
             The splined raw_data of each frame
         '''
+
+        if columntype is not 'single' and columntype is not 'multiple':
+            raise Exception('Columntype must be single (one column including several frames) or multiple (each frame one row).')
 
         if steps == None:
             steps = (xmax - xmin)*4
@@ -524,24 +530,37 @@ class rR_Analyzer:
         x_dict = {}
         y_dict = {}
         for nr in range(len(frame_names)):
-            df = pd.read_csv(os.path.join(file_frame_path,str(frame_names[nr])), sep="\t", header=None)
+            path = os.path.join(file_frame_path,str(frame_names[nr]))
+            df = pd.read_csv(path, sep="\t", header=None)
             data_array = np.array(df)
-            frames_n, indices = np.unique(data_array[0:,-2], return_index=True)
-            frames = [int(i) for i in frames_n]
-            nr_of_frames=frames[-1]
-            print('File ('+str(frame_names[nr])+') No.'+str(nr)+' -> '+str(nr_of_frames)+' frames')
+            
+            if columntype == 'single':
+                frames_n, indices = np.unique(data_array[0:,-2], return_index=True)
+                frames = [int(i) for i in frames_n]
+                nr_of_frames=frames[-1]
+                print('File ('+str(frame_names[nr])+') No.'+str(nr)+' -> '+str(nr_of_frames)+' frames')
 
-            x_dict['x_'+str(nr)] = data_array[indices[0]:indices[1],0]
-            for i in range(len(frames)):
-                if i < int(len(frames)-1):
-                    y_dict['y'+str(i)+'_'+str(frame_names[nr][3:-4])] = data_array[indices[i]:indices[i+1],-1]
-                else:
-                    y_dict['y'+str(i)+'_'+str(frame_names[nr][3:-4])] = data_array[indices[i]:,-1]
+                x_dict['x_'+str(nr)] = data_array[indices[0]:indices[1],0]
+                for i in range(len(frames)):
+                    if i < int(len(frames)-1):
+                        y_dict['y'+str(i)+'_'+str(frame_names[nr][3:-4])] = data_array[indices[i]:indices[i+1],-1]
+                    else:
+                        y_dict['y'+str(i)+'_'+str(frame_names[nr][3:-4])] = data_array[indices[i]:,-1]
+            
+            elif columntype == 'multiple':
+                frames_n = data_array[3:,0]
+                frames = [int(i) for i in frames_n]
+                nr_of_frames=frames[-1]
+                print('File ('+str(frame_names[nr])+') No.'+str(nr)+' -> '+str(nr_of_frames)+' frames')
+                x_dict['x_'+str(nr)] = data_array[1,2:-1]
+                for i in range(len(frames)):
+                    y_dict['y'+str(i)+'_'+str(frame_names[nr][3:-4])] = data_array[i+3,2:-1]
+
             self._x_frame_data = x_dict
             self._y_frame_data = y_dict
             self.plot_frames(nr_of_frames=nr_of_frames, xmin_p=xmin, xmax_p=xmax, steps=steps,
-                         data_to_plot=y_dict, filenumber=nr)
-
+                            data_to_plot=y_dict, filenumber=nr)
+        
         self._x_frame_data = x_dict
         self._y_frame_data = y_dict
 
